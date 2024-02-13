@@ -1,0 +1,187 @@
+esphome:
+  name: esp32-midea-folowme-pid
+  friendly_name: esp32-midea-folowme-pid
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esp32-Midea Fallback Hotspot"
+    password: "XSht9Yqgu7lH"
+
+captive_portal:
+
+
+button:
+  - platform: template
+    name: "PID Climate Autotune"
+    on_press:
+      - climate.pid.autotune: pid_climate
+    
+
+output:
+  - platform: template 
+    id: output_for_pid
+    type: float
+    write_action:
+      - number.set:
+            id: midea_higher_or_lower_than_set_temp
+            value: !lambda 'return (-7*state)+2;'
+
+
+number:
+  - platform: template
+    name: "midea_higher_or_lower_than_set_temp"
+    id: midea_higher_or_lower_than_set_temp
+    min_value: -5
+    max_value: 2
+    mode: box
+    step: 1
+    optimistic: true
+    restore_value: true
+
+
+sensor:
+  - platform: homeassistant
+    entity_id: sensor.hvac_power
+    id: powa
+
+  - platform: template
+    name: "midea_folowme_sent_number"
+    id: midea_folowme_sent_number
+    unit_of_measurement: "°C"
+    lambda: |- 
+           return id(midea_higher_or_lower_than_set_temp).state;
+    filters:
+      - lambda: return x + id(midea_ir_climate).target_temperature;
+
+  - platform: homeassistant
+    id: set_temp
+    entity_id: climate.midea_ac_ir
+    attribute: target_temperature
+
+  - platform: homeassistant
+    id: current_temp
+    entity_id: sensor.livingroom_temp
+
+
+switch:
+  - platform: template
+    name: midea folowme
+    id: midea_transmit
+    optimistic: True
+    restore_mode: restore_default_off
+
+
+remote_transmitter:
+  pin: 13
+  carrier_duty_percent: 50%
+
+
+remote_receiver:
+  id: receiver
+  pin:
+    number: 14
+    inverted: False
+  dump: midea
+
+
+climate:
+  - platform: midea_ir 
+    name: "Living Room AC IR"
+    receiver_id: receiver
+    sensor: current_temp
+    id: midea_ir_climate
+  
+  - platform: pid
+    id: pid_climate
+    name: "PID Climate Controller"
+    sensor: powa
+    default_target_temperature: 500
+    heat_output: output_for_pid
+    visual:
+      min_temperature: 0
+      max_temperature: 1500
+      temperature_step: 50
+    control_parameters:
+      output_averaging_samples: 1000
+      kp: 0.00262
+      ki: 0.00002
+      kd: 0.11093
+    deadband_parameters:
+      threshold_high: 50
+      threshold_low: 50
+
+#id_climate_controller: PID Autotune:
+# State: Succeeded!
+# Oscillation Frequency is not symmetrical. PID parameters may be inaccurate!
+#   This is usually because the heat and cool processes do not change the temperature at the same rate.
+#   Please try reducing the positive_output value (or increase negative_output in case of a cooler)
+# Calculated PID parameters ("Ziegler-Nichols PID" rule):
+#
+# control_parameters:
+#   kp: 0.00262
+#   ki: 0.00002
+#   kd: 0.11093
+#
+# Please copy these values into your YAML configuration! They will reset on the next reboot.
+# Alternative Rules:
+#   Rule 'Ziegler-Nichols PI':
+#     kp: 0.00196, ki: 0.00001, kd: 0.00000
+#   Rule 'Pessen Integral PID':
+#     kp: 0.00305, ki: 0.00002, kd: 0.15530
+#   Rule 'Some Overshoot PID':
+#     kp: 0.00145, ki: 0.00001, kd: 0.16418
+#   Rule 'No Overshoot PID':
+#     kp: 0.00087, ki: 0.00001, kd: 0.09244
+
+
+#old settings:
+
+#calculated PID parameters ("Ziegler-Nichols PID" rule):
+#c
+#control_parameters:
+#c kp: 0.00161
+#c ki: 0.00002
+#c kd: 0.03435
+#c
+#clease copy these values into your YAML configuration! They will reset on the next reboot.
+#clternative Rules:
+#c Rule 'Ziegler-Nichols PI':
+#c   kp: 0.00121, ki: 0.00001, kd: 0.00000
+#c Rule 'Pessen Integral PID':
+#c   kp: 0.00188, ki: 0.00003, kd: 0.04809
+#c Rule 'Some Overshoot PID':
+#c   kp: 0.00089, ki: 0.00001, kd: 0.05084
+#c Rule 'No Overshoot PID':
+#c   kp: 0.00054, ki: 0.00001, kd: 0.02862
+
+
+
+interval:
+  - interval: 10s
+    id: midea_feedback_dozer_interval
+    then:
+      - if: 
+          condition:
+            - switch.is_on: midea_transmit
+            - lambda: 'return id(midea_ir_climate).mode == CLIMATE_MODE_HEAT;'
+          then:
+            - remote_transmitter.transmit_midea:
+               code: !lambda |-
+                 return {0xA4, 0x82, 0x48, 0x7F, (uint8_t)(id(midea_folowme_sent_number).state)};
