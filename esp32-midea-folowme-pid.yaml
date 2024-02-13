@@ -75,7 +75,7 @@ sensor:
 
   - platform: homeassistant
     id: set_temp
-    entity_id: climate.midea_ac_ir
+    entity_id: climate.living_room_ac_ir
     attribute: target_temperature
 
   - platform: homeassistant
