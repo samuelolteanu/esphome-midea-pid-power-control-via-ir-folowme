@@ -7,4 +7,4 @@ The way to use this feature is to enable folowme switch, set the pid (climate) c
 
 Disclaimer: This may lower the ac efficiency.
 
-Use case: matching photovoltaic power to have "free" heating in a home assistant automation.
+Use case: matching photovoltaic power to have "free" heating using a home assistant automation.
