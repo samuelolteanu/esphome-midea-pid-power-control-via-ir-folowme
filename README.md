@@ -1,3 +1,4 @@
+![Capture](https://github.com/samuelolteanu/esphome-midea-pid-power-control-via-ir-folowme/assets/85267083/10bc9cdf-92fc-46f6-b4f8-98cdeeccad76)
 With this ESPHome ir tranmitter, it is possible to trick a Midea split air conditioner into lowering or increasing power consumption by periodically sending a certain room temp via "folowme" feature. This is taken care of by a pid controller that sends a range of temps for heating mode like this:
 - max power: set temp - 5
 - min power: set temp + 2.
